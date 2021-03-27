@@ -1,0 +1,340 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>Making your first Phaser 3 Game - Part 10</title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+var config = {
+    type: Phaser.AUTO,
+    width: 3200,
+    height: 1080,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },
+            debug: true
+        }
+    },
+    input:{gamepad:true},
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+};
+var paddle;
+var boutonFeuManette;
+var paddleConnected=false;
+var player;
+var stars;
+var bombs;
+var soleil;
+var platforms;
+var cursors;
+var score = 0;
+var gameOver = false;
+var scoreText;
+
+var game = new Phaser.Game(config);
+
+function preload ()
+{
+    this.load.image('sky', 'assets/sky.png');
+    this.load.image('ground', 'assets/platform.png');
+    this.load.image('star', 'assets/star.png');
+    this.load.image('bomb', 'assets/bomb.png');
+    this.load.image('soleil', 'assets/soleil.png')
+    this.load.image('bordmap', 'assets/bordmap.png')
+    this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
+    this.iter = 3.14;
+}
+
+    var FlyingStar = new Phaser.Class({
+
+    Extends: Phaser.Physics.Arcade.Sprite,
+
+    initialize:
+
+    function FlyingStar (scene, x, y, width, height, speed)
+    {
+        Phaser.Physics.Arcade.Sprite.call(this, scene, x, y, 'star');
+
+       
+        this.path = new Phaser.Curves.Ellipse(x, y, width, height);
+        this.pathIndex = 0;
+        this.pathSpeed = speed;
+        this.pathVector = new Phaser.Math.Vector2();
+
+        this.path.getPoint(0, this.pathVector);
+
+        this.setPosition(this.pathVector.x, this.pathVector.y);
+    },
+
+    preUpdate: function (time, delta)
+    {
+        this.anims.update(time, delta);
+
+        this.path.getPoint(this.pathIndex, this.pathVector);
+
+        this.setPosition(this.pathVector.x, this.pathVector.y);
+
+        this.pathIndex = Phaser.Math.Wrap(this.pathIndex + this.pathSpeed, 0, 1);
+    }
+
+});
+    
+function create ()
+{
+
+    this.add.image(1000, 535, 'sky');
+
+     platforms = this.physics.add.staticGroup();
+
+    platforms.create(500, 568, 'ground').setScale(2).refreshBody();
+
+    platforms.create(1500, 400, 'ground');
+    platforms.create(50, 250, 'ground');
+    platforms.create(750, 220, 'ground');
+    platforms.create(2000, 800, 'ground');
+    platforms.create(1400, 750, 'ground');
+    platforms.create(600, 1050, 'ground').setScale(3).refreshBody();
+    platforms.create(1800, 1050, 'ground').setScale(3).refreshBody();
+    platforms.create(2200, 1050, 'ground').setScale(3).refreshBody();
+    platforms.create(2500, 540, 'bordmap');
+
+    player = this.physics.add.sprite(150, 450, 'dude');
+
+    soleil = this.physics.add.group({
+        key : 'soleil',
+        repeat: 0,
+        setXY: { x: 540, y: 870, stepX: 500 },
+    });
+    
+    var soleil1 = soleil.create(1200, 350, 'soleil');
+
+    player.setBounce(0.2);
+    player.setCollideWorldBounds(true);
+
+    var stars = this.physics.add.group({ allowGravity: false });
+
+    stars.add(new FlyingStar(this, 150, 100, 100, 100, 0.005), true);
+    stars.add(new FlyingStar(this, 500, 200, 40, 100, 0.005), true);
+    stars.add(new FlyingStar(this, 600, 200, 40, 100, -0.005), true);
+    stars.add(new FlyingStar(this, 700, 200, 40, 100, 0.01), true);
+    
+    this.anims.create({
+        key: 'left',
+        frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
+        frameRate: 10,
+        repeat: -1
+    });
+
+    this.anims.create({
+        key: 'turn',
+        frames: [ { key: 'dude', frame: 4 } ],
+        frameRate: 20
+    });
+
+    this.anims.create({
+        key: 'right',
+        frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
+        frameRate: 10,
+        repeat: -1
+    });
+
+    //  Input Events
+    cursors = this.input.keyboard.createCursorKeys();
+
+     this.physics.add.collider(player, platforms);
+
+    this.cameras.main.setBounds(0, 0, 3200, 1824)
+    this.cameras.main.setSize(1920, 1080);
+    this.cameras.main.startFollow(player);
+
+    this.physics.add.overlap(player, stars, collectStar, null, this);
+    
+    //  Some stars to collect, 12 in total, evenly spaced 70 pixels apart along the x axis
+    stars = this.physics.add.group({
+        key: 'star',
+        repeat: 11,
+        setXY: { x: 12, y: 0, stepX: 70 }
+    });
+
+    stars.children.iterate(function (child) {
+
+        //  Give each star a slightly different bounce
+        child.setBounceY(Phaser.Math.FloatBetween(0, 1));
+
+    });
+//boutonFeuManette = this.input.gamepad.pad('B');
+
+    bombs = this.physics.add.group();
+
+    
+    scoreText = this.add.text(16, 16, 'etoiles: 0', { fontSize: '32px', fill: '#000' });
+
+   
+    this.physics.add.collider(player, platforms);
+    this.physics.add.collider(stars, platforms);
+    this.physics.add.collider(bombs, platforms);
+    this.physics.add.collider(soleil, platforms);
+   
+    this.physics.add.overlap(player, stars, collectStar, null, this);
+    
+
+     /*if ( Phaser.Input.Gamepad.JustDown(boutonFeuManette)){
+            if(pistolet == true){
+            tirer(player);
+            }
+        }*/
+
+
+        this.input.gamepad.once('connected', function (pad) {
+    //   'pad' is a reference to the gamepad that was just connected
+    paddleConnected = true;
+    paddle = pad;
+    });
+
+    if (paddleConnected == true)
+    {
+        if (paddle.A && player.body.touching.down)
+        {
+        player.setVelocityY(-750);
+        }
+
+        else if (paddle.R2 && player.body.touching.down)
+        {
+            player.direction = 'right';
+            player.setVelocityX(750);
+            player.anims.play('right', true);
+        }
+
+        else if (paddle.R2 && !player.body.touching.down)
+        {
+            player.setVelocityX(750);
+            player.anims.play('right', true);
+        }
+
+        else if (paddle.L2 && player.body.touching.down)
+        {   
+            player.direction = 'left';
+            player.setVelocityX(-750);
+            player.anims.play('left', true);
+        }
+
+        else if (paddle.L2 && !player.body.touching.down)
+        {
+            player.setVelocityX(-750);
+            player.anims.play('left', true);
+        }
+        
+        else if (paddle.L1 && !player.body.touching.down)
+            {
+                player.setVelocityY(750);
+            }
+        if (paddle.B){
+            if(pistolet == true){
+            tirer(player);
+            }
+        }
+        if (paddle.Y){
+            explication = false;
+            panneau_explication.anims.play('panneau_disparait');  
+            }
+    
+        if ( paddle.X){
+            explication2 = false;
+            panneau_explication2.anims.play('panneau2_disparait');
+            }
+    }    
+    this.physics.add.collider(player, bombs, hitBomb, null, this);
+}
+
+function update ()
+{
+    if (gameOver)
+    {
+        return;
+    }
+
+    if (cursors.left.isDown)
+    {
+        player.setVelocityX(-400);
+
+        player.anims.play('left', true);
+    }
+    else if (cursors.right.isDown)
+    {
+        player.setVelocityX(400);
+
+        player.anims.play('right', true);
+    }
+
+    if (cursors.up.isDown)
+    {
+        player.setVelocityY(-400);
+    }
+    
+    else if (cursors.down.isDown)
+    {
+        player.setVelocityY(400)    
+    }
+}
+
+function collectStar (player, star)
+{
+    star.disableBody(true, true);
+
+    //  Add and update the score
+    score += 1;
+    scoreText.setText('etoile: ' + score);
+    
+    /*
+    if (stars.countActive(true) === 0)
+    {
+        stars.children.iterate(function (child) {
+
+            child.enableBody(true, child.x, 0, true, true);
+
+        });
+
+        var x = (player.x < 400) ? Phaser.Math.Between(400, 800) : Phaser.Math.Between(0, 400);
+
+        var bomb = bombs.create(x, 16, 'bomb');
+        bomb.setBounce(1);
+        bomb.setCollideWorldBounds(true);
+        bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);
+        bomb.allowGravity = false;
+
+    }*/
+    
+}
+
+function hitBomb (player, bomb)
+{
+    this.physics.pause();
+
+    player.setTint(0xff0000);
+
+    player.anims.play('turn');
+
+    gameOver = true;
+}
+   
+
+
+
+</script>
+
+</body>
+</html>
