@@ -16,7 +16,7 @@
 
 var config = {
     type: Phaser.AUTO,
-    width: 3200,
+    width: 2600,
     height: 1080,
     physics: {
         default: 'arcade',
@@ -110,7 +110,6 @@ function create ()
     platforms.create(600, 1050, 'ground').setScale(3).refreshBody();
     platforms.create(1800, 1050, 'ground').setScale(3).refreshBody();
     platforms.create(2200, 1050, 'ground').setScale(3).refreshBody();
-    platforms.create(2500, 540, 'bordmap');
 
     player = this.physics.add.sprite(150, 450, 'dude');
 
